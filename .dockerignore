@@ -1,0 +1,19 @@
+# Модели — монтируются через volume, не копируем в образ
+data/models/
+data/qdrant_storage/
+data/qdrant_snapshots/
+data/knowledge_base.json
+
+# Jupyter и временные файлы
+*.ipynb
+*.pyc
+__pycache__/
+.ipynb_checkpoints/
+
+# Виртуальное окружение
+venv/
+.venv/
+env/
+
+# Git
+.git/

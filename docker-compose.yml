@@ -1,0 +1,117 @@
+# =============================================================================
+# docker-compose.yml — полный стек RAG-Chatbot
+# =============================================================================
+
+services:
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ${QDRANT_STORAGE_PATH}:/qdrant/storage
+      - ${QDRANT_SNAPSHOTS_PATH}:/qdrant/snapshots
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm-qwen
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ${QWEN_MODEL_PATH}:/model
+    command: >
+      /model
+      --quantization awq_marlin
+      --max-model-len 3072
+      --gpu-memory-utilization 0.90
+      --max-num-seqs 1
+      --generation-config vllm
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag-app
+    profiles: ["cli"]
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${MODELS_HOST_PATH}:/app/models:ro
+      - ./config.yaml:/app/config.yaml
+      - ./data:/app/data
+    depends_on:
+      - qdrant
+      - vllm
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ── Bitrix24 Webhook API ───────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${MODELS_HOST_PATH}:/app/models:ro
+      - ./config.yaml:/app/config.yaml
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    command: ["python", "-m", "api.bitrix_webhook"]
+    depends_on:
+      - qdrant
+      - vllm
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ── Планировщик синхронизации Confluence ────────────────────────────────────
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag-scheduler
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ${MODELS_HOST_PATH}:/app/models:ro
+      - ./config.yaml:/app/config.yaml
+      - ${QDRANT_STORAGE_PATH}:/app/data/qdrant_storage
+      - ${MODELS_HOST_PATH}:/app/data/models:ro
+    command: ["python", "scripts/scheduler.py"]
+    depends_on:
+      - qdrant
+      - vllm
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
