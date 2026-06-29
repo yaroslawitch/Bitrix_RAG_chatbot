@@ -33,7 +33,7 @@ RAG-Chatbot/
 │   ├── confluence_auth.py    # OAuth 2.0 клиент для Confluence
 │   ├── auth_confluence.py    # Скрипт первичной авторизации
 │   ├── scheduler.py          # Планировщик синхронизации (по расписанию)
-│   └── download_all_models.py # Скрипт скачивания моделей
+│   └── download.py           # Скрипт скачивания моделей
 ├── api/
 │   └── bitrix_webhook.py     # FastAPI сервер для Bitrix24
 ├── data/
@@ -164,6 +164,37 @@ indexing:
 который перекрывает `final\\\_top\\\_k`. Фактически работает значение из `orchestrator.top\\\_k`.
 
 \---
+
+## Загрузка моделей
+
+Перед запуском необходимо скачать модели. Скрипт `scripts/download.py` скачивает все модели из Hugging Face:
+
+```bash
+python scripts/download.py
+```
+
+**Что скачивается:**
+
+| Модель | Описание | Путь |
+|--------|----------|------|
+| intfloat/multilingual-e5-large | Dense-эмбеддинги (1024-d) | `data/models/multilingual-e5-large/` |
+| BAAI/bge-reranker-v2-m3 | Cross-encoder реранкер | `data/models/bge-reranker-v2-m3/` |
+| Qwen/Qwen2.5-7B-Instruct | LLM (AWQ-квантованная) | `data/models/qwen2.5-7b-instruct-awq/` |
+
+**Авторизация:** если в `.env` задан `HF_TOKEN`, скрипт использует его для авторизации (ускоряет загрузку).
+
+**Флаги:**
+
+| Флаг | Описание |
+|------|----------|
+| `--force` | Перекачать модели даже если они уже скачаны |
+| `--dry-run` | Показать что будет скачано без загрузки |
+
+Модели пропускаются если уже скачаны (кроме `--force`).
+
+**Дополнительная модель:** `Qdrant/bm25` (sparse-эмбеддинги) — не требует ручной загрузки, кэшируется автоматически библиотекой `fastembed` при первом запуске.
+
+---
 
 ## Развёртывание
 
